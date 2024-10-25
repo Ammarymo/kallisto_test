@@ -40,20 +40,18 @@ process QUANTIFICATION {
     tuple val(sample_id), path(reads)
 
     output:
-    path "${sample_id}/abundance.tsv", emit: abundance
-    path "${sample_id}/run_info.json", emit: run_info
-    path "${sample_id}", emit: kallisto_dir
+    path "$sample_id"
 
     script:
     if (params.single) {
         // Single-end reads
         """
-        kallisto quant -i $transcripts_idx -o $sample_id -b 100 $reads --single -l 200 -s 20 -t $params.threads
+        kallisto quant -i $transcripts_idx -o $sample_id -b 100 $reads --single -l 200 -s 20 -t $params.threads 2> "$sample_id".log
         """
     } else {
         // Paired-end reads
         """
-        kallisto quant -i $transcripts_idx -o $sample_id -b 100 ${reads[0]} ${reads[1]} -t $params.threads
+        kallisto quant -i $transcripts_idx -o $sample_id -b 100 ${reads[0]} ${reads[1]} -t $params.threads 2> "$sample_id".log
         """
     }
 }
@@ -105,8 +103,6 @@ process PRINT_PARAMS_R {
     """
     Rscript -e "
         library(tidyverse)
-        # Print parameters
-        glimpse(mtcars)
         cat('Threads: $threads\n')
         cat('Reference: $reference\n')
         cat('Single-end: $single\n')
@@ -125,7 +121,7 @@ workflow {
 
     fastqc_ch = FASTQC(read_pairs_ch)
 
-    MULTIQC(quant_ch.kallisto_dir.mix(fastqc_ch).collect())
+    MULTIQC(quant_ch.mix(fastqc_ch).collect())
 
     PRINT_PARAMS_R(params.threads, params.reference, params.single, params.outdir)
 }

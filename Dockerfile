@@ -1,10 +1,17 @@
 FROM debian:bullseye-slim
 
-LABEL image.author.name="Ammar Y. Mohamed"
-LABEL image.author.email="amar.add655@gmail.com"
+LABEL image.author.name="Ammar Y. Mohamed" \
+      image.author.email="amar.add655@gmail.com"
 
-RUN apt-get update && apt-get install -y \
+# Install basic dependencies, then remove build tools and dev libraries after installation
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     wget \
+    r-base \
+    r-cran-tidyverse \
+    default-jdk \
+    python3-pip && \
+    apt-get install -y --no-install-recommends \
     build-essential \
     zlib1g-dev \
     libncurses5-dev \
@@ -14,34 +21,26 @@ RUN apt-get update && apt-get install -y \
     libreadline-dev \
     libsqlite3-dev \
     libcurl4-openssl-dev \
-    libxml2-dev \
-    libssl-dev \
-    r-base \
-    && rm -rf /var/lib/apt/lists/*
+    libxml2-dev && \
+    # Install Kallisto
+    wget https://github.com/pachterlab/kallisto/releases/download/v0.46.2/kallisto_linux-v0.46.2.tar.gz -O /tmp/kallisto.tar.gz && \
+    tar -xvzf /tmp/kallisto.tar.gz -C /usr/local/bin --strip-components=1 kallisto/kallisto && \
+    rm /tmp/kallisto.tar.gz && \
+    # Install FastQC
+    wget https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.12.1.zip -O /tmp/fastqc.zip && \
+    unzip /tmp/fastqc.zip -d /opt && \
+    chmod +x /opt/FastQC/fastqc && \
+    ln -s /opt/FastQC/fastqc /usr/local/bin/fastqc && \
+    rm /tmp/fastqc.zip && \
+    # Install MultiQC
+    pip3 install multiqc && \
+    # Remove build dependencies and cleanup
+    apt-get remove --purge -y build-essential zlib1g-dev libncurses5-dev libbz2-dev liblzma-dev libssl-dev libreadline-dev libsqlite3-dev libcurl4-openssl-dev libxml2-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/*
 
-# Install Miniconda
-RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh && \
-    bash /tmp/miniconda.sh -b -p /opt/conda && \
-    rm /tmp/miniconda.sh && \
-    /opt/conda/bin/conda clean -a -y && \
-    ln -s /opt/conda/bin/conda /usr/local/bin/conda
-
-# Create the Conda environment
-RUN conda create -n nf-pipeline -y \
-    -c bioconda \
-    -c conda-forge \
-    kallisto \
-    fastqc \
-    multiqc \
-    r-base \
-    r-tidyverse
-
-# Ensure Conda is initialized for non-interactive shells
-RUN echo "source /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc
-
-# Set the default command to activate the environment and keep the shell open
-CMD ["/bin/bash", "-c", "source /opt/conda/etc/profile.d/conda.sh && conda activate nf-pipeline && exec /bin/bash"]
-
+# Create workspace
 WORKDIR /workspace
 
-COPY . /workspace
+# Default command
+CMD ["/bin/bash"]
